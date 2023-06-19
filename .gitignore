@@ -1,0 +1,10 @@
+﻿################################################################################
+# This .gitignore file was automatically created by Microsoft(R) Visual Studio.
+################################################################################
+
+/SplatDev.DigitalBookCurator.Console/bin/Debug/net7.0
+/SplatDev.DigitalBookCurator.Console/obj
+/SplatDev.DigitalBookCurator.Core/bin/Debug/net7.0
+/SplatDev.DigitalBookCurator.Core/obj
+/SplatDev.DigitalBookCurator.Tests/bin/Debug/net7.0
+/SplatDev.DigitalBookCurator.Tests/obj
