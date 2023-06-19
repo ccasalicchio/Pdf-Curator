@@ -19,6 +19,14 @@ namespace SplatDev.DigitalBookCurator.Core.Extensions
             }
         }
 
+        public static byte[] DefaultPdfThumbnail(this string path)
+        {
+            using FileStream img = File.Open(path, FileMode.Open);
+            MemoryStream stream = new();
+            img.CopyTo(stream);
+            return ImageExtensions.StreamToByteArray(stream);
+        }
+
         public static byte[]? ExtractThumbnail(this string path)
         {
             try

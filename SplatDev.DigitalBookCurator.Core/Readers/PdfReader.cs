@@ -75,7 +75,30 @@ namespace SplatDev.DigitalBookCurator.Core.Readers
             catch (Exception ex)
             {
                 logger.LogError("Error Parsing Pdf: {ex}", ex.Message);
-                return null;
+                logger.LogInformation("Cataloging a simplified version of the Book");
+                var fileInfo = new FileInfo(path);
+
+#pragma warning disable CS8601 // Possible null reference assignment.
+                book = new Book
+                {
+                    Author = null,
+                    Creator = null,
+                    Format = fileInfo.Extension[1..],
+                    Keywords = null,
+                    Pages = null,
+                    Producer = null,
+                    Size = fileInfo.Length,
+                    Title = fileInfo.Name,
+                    Subject = null,
+                    Version = null,
+                    Language = null,
+                    AddedDate = null,
+                    CreatedDate = path.GetPdfCreationDate(),
+                    Thumbnail = SplatDev.DigitalBookCurator.Core.Extensions.PdfExtensions.DefaultPdfThumbnail(Path.Combine(Environment.CurrentDirectory, "Asset", "pdf-icon.png")),
+                    FileName = fileInfo.Name
+                };
+#pragma warning restore CS8601 // Possible null reference assignment.
+                return book;
             }
         }
     }

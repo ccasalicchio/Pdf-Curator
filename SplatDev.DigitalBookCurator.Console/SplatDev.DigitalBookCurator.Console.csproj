@@ -31,6 +31,9 @@
     <None Update="Asset\ASP_NET_Core_Succinctly.pdf">
       <CopyToOutputDirectory>Never</CopyToOutputDirectory>
     </None>
+    <None Update="Asset\pdf-icon.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
     <None Update="Database\Curator.db">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>

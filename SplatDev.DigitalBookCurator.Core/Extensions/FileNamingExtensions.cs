@@ -24,8 +24,6 @@ namespace SplatDev.DigitalBookCurator.Core.Extensions
                 .Replace("\\r\\n", " ")
                 .Replace(FileExtensions.PDF[1..], "")
                 .Replace(FileExtensions.PDF[1..].ToUpper(), "")
-                .Replace(FileExtensions.CHM[1..], "")
-                .Replace(FileExtensions.CHM[1..].ToUpper(), "")
                 .Replace("  "," ")
                 .ToString()
                 .CapitalizeFirstLetter()

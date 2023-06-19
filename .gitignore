@@ -8,3 +8,5 @@
 /SplatDev.DigitalBookCurator.Core/obj
 /SplatDev.DigitalBookCurator.Tests/bin/Debug/net7.0
 /SplatDev.DigitalBookCurator.Tests/obj
+/.vs
+/Database

@@ -9,6 +9,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SplatDev.DigitalBookCurator
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SplatDev.DigitalBookCurator.Console", "SplatDev.DigitalBookCurator.Console\SplatDev.DigitalBookCurator.Console.csproj", "{453045FB-0F9F-4CB5-8B3C-3679C6A7A327}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Database", "Database", "{F8E41614-A315-4A22-BCAE-9D20F2B5B79E}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
