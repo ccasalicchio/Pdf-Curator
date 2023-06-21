@@ -10,3 +10,6 @@
 /SplatDev.DigitalBookCurator.Tests/obj
 /.vs
 /Database
+/SplatDev.DigitalBookCurator.Console/bin/Release/net7.0
+/SplatDev.DigitalBookCurator.Core/bin/Release/net7.0
+/SplatDev.DigitalBookCurator.Tests/bin/Release/net7.0
