@@ -20,20 +20,14 @@ namespace SplatDev.DigitalBookCurator.Core.Services
             this.logger = logger;
         }
 
-        public async Task OrganizeFiles(string rootPath, string destination = "", string extension = FileExtensions.PDF)
+        public async Task OrganizeFiles(string path, string destination = "", string extension = FileExtensions.PDF)
         {
             var intro = "Introduction";
-            var rootDirectory = new DirectoryInfo(rootPath);
+            OnFolderTraverse?.Invoke(this, path);
 
-            if (rootDirectory is null) return;
-
-            var allFolders = rootDirectory.GetDirectories("*", SearchOption.AllDirectories);
-            OnFolderTraverse?.Invoke(this, rootPath);
-
-            foreach (var folder in allFolders)
-                await OrganizeFiles(folder.FullName, destination, extension);
-
-            var allFiles = rootDirectory.GetFiles(extension, SearchOption.AllDirectories);
+            var directory = new DirectoryInfo(path);
+            if (directory is null) return;
+            var allFiles = directory.GetFiles(extension, SearchOption.TopDirectoryOnly);
             foreach (var file in allFiles)
             {
                 var book = ProcessBookFile(file.FullName, extension);
@@ -42,7 +36,7 @@ namespace SplatDev.DigitalBookCurator.Core.Services
                     var existingBook = await bookRepository.GetBookByTitleAsync(book.Title);
                     if (existingBook != null)
                     {
-                        logger.LogWarning("Book already exists: {title}", book.Title);
+                        logger.LogError("Book already exists: {title}", book.Title);
                         continue;
                     }
                     var bookName = !string.IsNullOrEmpty(book.Title) ? book.Title : file.Name.CleanupFileName();
@@ -51,16 +45,15 @@ namespace SplatDev.DigitalBookCurator.Core.Services
                         bookName = new FileInfo(file.FullName).Name.CleanupFileName();
 
                     book.FileName = $"{bookName}{extension[1..]}";
-                    if (new FileInfo(Path.Combine(rootPath, Path.Combine(destination, book.FileName))).Exists)
+                    if (new FileInfo(Path.Combine(destination, book.FileName)).Exists)
                     {
-                        logger.LogWarning("File already exists: {filename}", book.FileName);
+                        logger.LogError("File already exists: {filename}", book.FileName);
+                        book.FileName = file.Name.CleanupFileName();
                         if (book.Title == PdfReader.GetBookTitle(file.FullName))
                         {
-                            logger.LogWarning("Book already exists: {title}", book.Title);
+                            logger.LogError("Book already exists: {title}", book.Title);
                             continue;
                         }
-
-                        book.FileName = $"{bookName}{new DirectoryInfo(rootPath).GetFiles(book.FileName).Length + 1}{extension[1..]}";
                     }
                     try
                     {
@@ -68,7 +61,7 @@ namespace SplatDev.DigitalBookCurator.Core.Services
 
                         await bookRepository.AddBookAsync(book);
 
-                        File.Move(file.FullName, Path.Combine(rootPath, Path.Combine(destination, book.FileName)));
+                        File.Move(file.FullName, Path.Combine(destination, book.FileName));
                         count++;
                         OnBookCountChanged?.Invoke(this, count);
                         OnBookAdded?.Invoke(this, book.Title);
@@ -80,6 +73,14 @@ namespace SplatDev.DigitalBookCurator.Core.Services
                     }
                 }
             }
+
+            var subDirectories = directory.GetDirectories("*", SearchOption.AllDirectories);
+            if (subDirectories.Length > 0)
+            {
+                foreach (var folder in subDirectories)
+                    await OrganizeFiles(folder.FullName, destination, extension);
+            }
+
         }
 
         public async Task DeleteEmptyFolders(string rootPath)
@@ -91,31 +92,27 @@ namespace SplatDev.DigitalBookCurator.Core.Services
 
         private void DeleteFolder(string path)
         {
-            var rootDirectory = new DirectoryInfo(path);
-            var allDirectories = rootDirectory.GetDirectories("*", SearchOption.AllDirectories);
-            foreach (var folder in allDirectories)
+            var directory = new DirectoryInfo(path);
+            OnFolderTraverse?.Invoke(this, path);
+
+            if (directory is null) return;
+
+            try
             {
-                OnFolderTraverse?.Invoke(this, folder.FullName);
-                var subDirectories = folder.GetDirectories("*", SearchOption.AllDirectories);
-                if (subDirectories.Length > 0)
+                var allDirectories = directory.GetDirectories("*", SearchOption.AllDirectories);
+
+                foreach (var folder in allDirectories)
+                    DeleteFolder(folder.FullName);
+
+                if (!directory.EnumerateFiles("*", SearchOption.TopDirectoryOnly).Any())
                 {
-                    foreach (var subdir in subDirectories)
-                    {
-                        DeleteFolder(subdir.FullName);
-                    }
-                }
-                if (!folder.EnumerateFiles("*", SearchOption.TopDirectoryOnly).Any())
-                {
-                    try
-                    {
-                        folder.Delete();
-                        count++;
-                        OnFolderCountChanged?.Invoke(this, count);
-                        OnFolderDeleted?.Invoke(this, folder.FullName);
-                    }
-                    catch { }
+                    directory.Delete();
+                    count++;
+                    OnFolderCountChanged?.Invoke(this, count);
+                    OnFolderDeleted?.Invoke(this, directory.FullName);
                 }
             }
+            catch { }
         }
 
         private Book? ProcessBookFile(string path, string extension)
@@ -124,6 +121,11 @@ namespace SplatDev.DigitalBookCurator.Core.Services
             {
                 _ => new PdfReader().ReadPdf(logger, path),
             };
+        }
+
+        public void DeleteBook(int id)
+        {
+            OnBookDeleted?.Invoke(OnBookDeleted, id.ToString());
         }
 
         #region Events

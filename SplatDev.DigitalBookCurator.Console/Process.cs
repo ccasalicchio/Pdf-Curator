@@ -7,7 +7,7 @@ namespace SplatDev.DigitalBookCurator.Console
 {
     public class Process
     {
-        private static readonly bool CleanupFolders = true;
+        private static bool CleanupFolders = false;
         public static async Task ProcessFiles(IServiceProvider hostProvider, CuratorSettings? settings, string[] args)
         {
             using IServiceScope serviceScope = hostProvider.CreateScope();
@@ -26,12 +26,12 @@ namespace SplatDev.DigitalBookCurator.Console
                 settings.Origin = new CuratorSettings().Origin;
             if (string.IsNullOrEmpty(settings.Destination))
                 settings.Destination = new CuratorSettings().Destination;
+            CleanupFolders = settings.DeleteEmptyFolders;
 
             string origin = settings.Origin;
             string destination = settings.Destination;
             if (args.Length > 0)
                 origin = args[0];
-
 
             System.Console.WriteLine("Cataloging Books:\r\n++++++++++++++++++++++++++++++++");
 
@@ -54,12 +54,12 @@ namespace SplatDev.DigitalBookCurator.Console
 
         private static void Manager_OnFolderTraverse(object? sender, string e)
         {
-            System.Console.WriteLine($"Now traversing folder: '{e}'");
+            System.Console.WriteLine($"Traversing: '{e}'");
         }
 
         private static void Manager_OnFolderCountChanged(object? sender, int e)
         {
-            System.Console.WriteLine($"Total folders deleted: {e}");
+            System.Console.Write($"#{e}. ");
         }
 
         private static void Manager_OnBookCountChanged(object? sender, int e)

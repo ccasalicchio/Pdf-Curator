@@ -78,7 +78,6 @@ namespace SplatDev.DigitalBookCurator.Core.Readers
                 logger.LogInformation("Cataloging a simplified version of the Book");
                 var fileInfo = new FileInfo(path);
 
-#pragma warning disable CS8601 // Possible null reference assignment.
                 book = new Book
                 {
                     Author = null,
@@ -92,12 +91,12 @@ namespace SplatDev.DigitalBookCurator.Core.Readers
                     Subject = null,
                     Version = null,
                     Language = null,
+                    Introduction = ex.Message,
                     AddedDate = null,
                     CreatedDate = path.GetPdfCreationDate(),
                     Thumbnail = SplatDev.DigitalBookCurator.Core.Extensions.PdfExtensions.DefaultPdfThumbnail(Path.Combine(Environment.CurrentDirectory, "Asset", "pdf-icon.png")),
                     FileName = fileInfo.Name
                 };
-#pragma warning restore CS8601 // Possible null reference assignment.
                 return book;
             }
         }

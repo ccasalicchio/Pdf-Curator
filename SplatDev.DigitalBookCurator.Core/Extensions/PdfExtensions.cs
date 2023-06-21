@@ -7,9 +7,9 @@ namespace SplatDev.DigitalBookCurator.Core.Extensions
     {
         public static DateTime? GetPdfCreationDate(this string path)
         {
-            Document pdfDocument = new(path);
             try
             {
+                Document pdfDocument = new(path);
                 return pdfDocument.Info.CreationDate;
 
             }

@@ -27,7 +27,8 @@ class Program
         CuratorSettings settings = new()
         {
             Origin = config["CuratorSettings:Origin"] ?? "",
-            Destination = config["CuratorSettings:Destination"] ?? ""
+            Destination = config["CuratorSettings:Destination"] ?? "",
+            DeleteEmptyFolders = bool.Parse(config["CuratorSettings:DeleteEmptyFolders"] ?? "false")
         };
 
         using IHost host = Host.CreateDefaultBuilder(args)
