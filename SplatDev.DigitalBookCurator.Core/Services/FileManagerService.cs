@@ -2,139 +2,200 @@
 
 using SplatDev.DigitalBookCurator.Core.Constants;
 using SplatDev.DigitalBookCurator.Core.Extensions;
-using SplatDev.DigitalBookCurator.Core.Models;
 using SplatDev.DigitalBookCurator.Core.Readers;
 using SplatDev.DigitalBookCurator.Core.Repositories;
+using SplatDev.Umbraco.Plugins.Models;
 
-namespace SplatDev.DigitalBookCurator.Core.Services
+using UglyToad.PdfPig.Tokens;
+
+namespace SplatDev.DigitalBookCurator.Core.Models;
+
+public class FileManagerService
 {
-    public class FileManagerService
+    private readonly IBookRepository bookRepository;
+    private readonly ILogger<FileManagerService> logger;
+    private static int count = 0;
+
+    public FileManagerService(IBookRepository bookRepository, ILogger<FileManagerService> logger)
     {
-        private readonly IBookRepository bookRepository;
-        private readonly ILogger<FileManagerService> logger;
-        private static int count = 0;
+        this.bookRepository = bookRepository;
+        this.logger = logger;
+    }
 
-        public FileManagerService(IBookRepository bookRepository, ILogger<FileManagerService> logger)
+    public async IAsyncEnumerable<BookImportResult> ProcessUploadedAsync(string path, string destination = "", string extension = FileExtensions.PDF)
+    {
+        var directory = new DirectoryInfo(path) ?? throw new MissingFieldException("path");
+        var allFiles = directory.GetFiles(extension, SearchOption.TopDirectoryOnly);
+        foreach (var file in allFiles)
         {
-            this.bookRepository = bookRepository;
-            this.logger = logger;
-        }
-
-        public async Task OrganizeFiles(string path, string destination = "", string extension = FileExtensions.PDF)
-        {
-            var intro = "Introduction";
-            OnFolderTraverse?.Invoke(this, path);
-
-            var directory = new DirectoryInfo(path);
-            if (directory is null) return;
-            var allFiles = directory.GetFiles(extension, SearchOption.TopDirectoryOnly);
-            foreach (var file in allFiles)
+            var book = ProcessBookFile(file.FullName, extension);
+            if (book is not null)
             {
-                var book = ProcessBookFile(file.FullName, extension);
-                if (book is not null)
+                var title = book.Title ?? book.Introduction ?? book.FileName;
+                var existingBook = await bookRepository.GetBookByTitleAsync(title);
+                var alreadyExistsMessage = $"Book already exists: {title}";
+                if (existingBook != null)
                 {
-                    var existingBook = await bookRepository.GetBookByTitleAsync(book.Title);
-                    if (existingBook != null)
+                    logger.LogError("Book already exists: {title}", title);
+                    yield return new BookImportResult
+                    {
+                        Book = existingBook,
+                        Success = false,
+                        Message = alreadyExistsMessage
+                    };
+                }
+                var bookName = !string.IsNullOrEmpty(title) ? title : file.Name.CleanupFileName();
+                if (bookName.Length <= 10 || bookName.Contains("Untitled", StringComparison.InvariantCultureIgnoreCase))
+                    bookName = new FileInfo(file.FullName).Name.CleanupFileName();
+
+                var optimizedBookName = bookName.Length >= 50 ? bookName[..50] : bookName;
+
+                book.FileName = $"{optimizedBookName}{extension[1..]}";
+                if (new FileInfo(Path.Combine(destination, book.FileName)).Exists)
+                {
+                    logger.LogError("File already exists: {filename}", book.FileName);
+                    book.FileName = file.Name.CleanupFileName();
+                    if (title == PdfReader.GetBookTitle(file.FullName))
+                    {
+                        logger.LogError("Book already exists: {title}", title);
+                        yield return new BookImportResult
+                        {
+                            Book = existingBook,
+                            Success = false,
+                            Message = alreadyExistsMessage
+                        };
+                    }
+                }
+                book.Title ??= optimizedBookName;
+
+                await bookRepository.AddBookAsync(book);
+
+                File.Move(file.FullName, Path.Combine(destination, book.FileName));
+                count++;
+                yield return new BookImportResult
+                {
+                    Book = existingBook,
+                    Success = true,
+                    Message = $"#{count} Book imported: {title}"
+                };
+            }
+        }
+    }
+
+    public async Task OrganizeFiles(string path, string destination = "", string extension = FileExtensions.PDF)
+    {
+        var intro = "Introduction";
+        OnFolderTraverse?.Invoke(this, path);
+
+        var directory = new DirectoryInfo(path);
+        if (directory is null) return;
+        var allFiles = directory.GetFiles(extension, SearchOption.TopDirectoryOnly);
+        foreach (var file in allFiles)
+        {
+            var book = ProcessBookFile(file.FullName, extension);
+            if (book is not null)
+            {
+                var existingBook = await bookRepository.GetBookByTitleAsync(book.Title);
+                if (existingBook != null)
+                {
+                    logger.LogError("Book already exists: {title}", book.Title);
+                    continue;
+                }
+                var bookName = !string.IsNullOrEmpty(book.Title) ? book.Title : file.Name.CleanupFileName();
+                var bookNameNormalized = bookName.Contains(intro) ? bookName[intro.Length..] : bookName;
+                if (bookNameNormalized.Length <= 10 || bookName.Contains("Untitled", StringComparison.InvariantCultureIgnoreCase))
+                    bookName = new FileInfo(file.FullName).Name.CleanupFileName();
+
+                book.FileName = $"{bookName}{extension[1..]}";
+                if (new FileInfo(Path.Combine(destination, book.FileName)).Exists)
+                {
+                    logger.LogError("File already exists: {filename}", book.FileName);
+                    book.FileName = file.Name.CleanupFileName();
+                    if (book.Title == PdfReader.GetBookTitle(file.FullName))
                     {
                         logger.LogError("Book already exists: {title}", book.Title);
                         continue;
                     }
-                    var bookName = !string.IsNullOrEmpty(book.Title) ? book.Title : file.Name.CleanupFileName();
-                    var bookNameNormalized = bookName.Contains(intro) ? bookName[intro.Length..] : bookName;
-                    if (bookNameNormalized.Length <= 10 || bookName.Contains("Untitled", StringComparison.InvariantCultureIgnoreCase))
-                        bookName = new FileInfo(file.FullName).Name.CleanupFileName();
-
-                    book.FileName = $"{bookName}{extension[1..]}";
-                    if (new FileInfo(Path.Combine(destination, book.FileName)).Exists)
-                    {
-                        logger.LogError("File already exists: {filename}", book.FileName);
-                        book.FileName = file.Name.CleanupFileName();
-                        if (book.Title == PdfReader.GetBookTitle(file.FullName))
-                        {
-                            logger.LogError("Book already exists: {title}", book.Title);
-                            continue;
-                        }
-                    }
-                    try
-                    {
-                        if (string.IsNullOrEmpty(book.Title)) book.Title = bookName;
-
-                        await bookRepository.AddBookAsync(book);
-
-                        File.Move(file.FullName, Path.Combine(destination, book.FileName));
-                        count++;
-                        OnBookCountChanged?.Invoke(this, count);
-                        OnBookAdded?.Invoke(this, book.Title);
-                    }
-                    catch (Exception ex)
-                    {
-                        // if could not add book to db, don't move it!
-                        logger.LogError("Error: {filename} | {error}", book.FileName, ex.Message);
-                    }
                 }
-            }
-
-            var subDirectories = directory.GetDirectories("*", SearchOption.AllDirectories);
-            if (subDirectories.Length > 0)
-            {
-                foreach (var folder in subDirectories)
-                    await OrganizeFiles(folder.FullName, destination, extension);
-            }
-
-        }
-
-        public async Task DeleteEmptyFolders(string rootPath)
-        {
-            count = 0;
-            await Task.FromResult(0);
-            DeleteFolder(rootPath);
-        }
-
-        private void DeleteFolder(string path)
-        {
-            var directory = new DirectoryInfo(path);
-            OnFolderTraverse?.Invoke(this, path);
-
-            if (directory is null) return;
-
-            try
-            {
-                var allDirectories = directory.GetDirectories("*", SearchOption.AllDirectories);
-
-                foreach (var folder in allDirectories)
-                    DeleteFolder(folder.FullName);
-
-                if (!directory.EnumerateFiles("*", SearchOption.TopDirectoryOnly).Any())
+                try
                 {
-                    directory.Delete();
+                    if (string.IsNullOrEmpty(book.Title)) book.Title = bookName;
+
+                    await bookRepository.AddBookAsync(book);
+
+                    File.Move(file.FullName, Path.Combine(destination, book.FileName));
                     count++;
-                    OnFolderCountChanged?.Invoke(this, count);
-                    OnFolderDeleted?.Invoke(this, directory.FullName);
+                    OnBookCountChanged?.Invoke(this, count);
+                    OnBookAdded?.Invoke(this, book.Title);
+                }
+                catch (Exception ex)
+                {
+                    // if could not add book to db, don't move it!
+                    logger.LogError("Error: {filename} | {error}", book.FileName, ex.Message);
                 }
             }
-            catch { }
         }
 
-        private Book? ProcessBookFile(string path, string extension)
+        var subDirectories = directory.GetDirectories("*", SearchOption.AllDirectories);
+        if (subDirectories.Length > 0)
         {
-            return extension switch
-            {
-                _ => new PdfReader().ReadPdf(logger, path),
-            };
+            foreach (var folder in subDirectories)
+                await OrganizeFiles(folder.FullName, destination, extension);
         }
 
-        public void DeleteBook(int id)
-        {
-            OnBookDeleted?.Invoke(OnBookDeleted, id.ToString());
-        }
-
-        #region Events
-        public event EventHandler<string>? OnBookAdded;
-        public event EventHandler<string>? OnBookDeleted;
-        public event EventHandler<string>? OnFolderDeleted;
-        public event EventHandler<int>? OnBookCountChanged;
-        public event EventHandler<int>? OnFolderCountChanged;
-        public event EventHandler<string>? OnFolderTraverse;
-        #endregion
     }
+
+    public async Task DeleteEmptyFolders(string rootPath)
+    {
+        count = 0;
+        await Task.FromResult(0);
+        DeleteFolder(rootPath);
+    }
+
+    private void DeleteFolder(string path)
+    {
+        var directory = new DirectoryInfo(path);
+        OnFolderTraverse?.Invoke(this, path);
+
+        if (directory is null) return;
+
+        try
+        {
+            var allDirectories = directory.GetDirectories("*", SearchOption.AllDirectories);
+
+            foreach (var folder in allDirectories)
+                DeleteFolder(folder.FullName);
+
+            if (!directory.EnumerateFiles("*", SearchOption.TopDirectoryOnly).Any())
+            {
+                directory.Delete();
+                count++;
+                OnFolderCountChanged?.Invoke(this, count);
+                OnFolderDeleted?.Invoke(this, directory.FullName);
+            }
+        }
+        catch { }
+    }
+
+    private Book? ProcessBookFile(string path, string extension)
+    {
+        return extension switch
+        {
+            _ => new PdfReader().ReadPdf(logger, path),
+        };
+    }
+
+    public void DeleteBook(int id)
+    {
+        OnBookDeleted?.Invoke(OnBookDeleted, id.ToString());
+    }
+
+    #region Events
+    public event EventHandler<string>? OnBookAdded;
+    public event EventHandler<string>? OnBookDeleted;
+    public event EventHandler<string>? OnFolderDeleted;
+    public event EventHandler<int>? OnBookCountChanged;
+    public event EventHandler<int>? OnFolderCountChanged;
+    public event EventHandler<string>? OnFolderTraverse;
+    #endregion
 }
