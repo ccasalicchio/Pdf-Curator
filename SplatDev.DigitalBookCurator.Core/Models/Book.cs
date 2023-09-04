@@ -8,7 +8,7 @@ namespace SplatDev.DigitalBookCurator.Core.Models
     [Table(TABLENAME)]
     [PrimaryKey("Id")]
     [Index(nameof(FileName), nameof(Title))]
-    public class Book
+    public class Book : IBook
     {
         public const string TABLENAME = "Books";
 
